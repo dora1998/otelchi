@@ -8,7 +8,7 @@ import (
 	"github.com/riandyrn/otelchi/version"
 	"go.opentelemetry.io/otel"
 	otelmetric "go.opentelemetry.io/otel/metric"
-	semconv "go.opentelemetry.io/otel/semconv/v1.20.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.32.0"
 )
 
 const (

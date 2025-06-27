@@ -762,12 +762,12 @@ type spanValueCheck struct {
 
 func getSemanticAttributes(serverName string, httpStatusCode int, httpMethod, httpRoute string) []attribute.KeyValue {
 	attrs := []attribute.KeyValue{
-		attribute.String("net.host.name", serverName),
-		attribute.String("http.method", httpMethod),
+		attribute.String("server.address", serverName),
+		attribute.String("http.request.method_original", httpMethod),
 		attribute.String("http.route", httpRoute),
 	}
 	if httpStatusCode != 0 {
-		attrs = append(attrs, attribute.Int("http.status_code", httpStatusCode))
+		attrs = append(attrs, attribute.Int("http.response.status_code", httpStatusCode))
 	}
 	return attrs
 }

@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	otelmetric "go.opentelemetry.io/otel/metric"
-	"go.opentelemetry.io/otel/semconv/v1.20.0/httpconv"
+	semconv "go.opentelemetry.io/otel/semconv/v1.32.0"
 )
 
 const (
@@ -29,7 +29,12 @@ func NewRequestInFlight(cfg BaseConfig) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// define metric attributes
-			attrs := otelmetric.WithAttributes(httpconv.ServerRequest(cfg.ServerName, r)...)
+			attrs := otelmetric.WithAttributes(
+			semconv.HTTPRequestMethodOriginal(r.Method),
+			semconv.URLScheme(r.URL.Scheme),
+			semconv.URLPath(r.URL.Path),
+			semconv.ServerAddress(cfg.ServerName),
+		)
 
 			// increase the number of requests in flight
 			counter.Add(r.Context(), 1, attrs)

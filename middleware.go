@@ -1,6 +1,7 @@
 package otelchi
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -15,8 +16,8 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 
-	semconv "go.opentelemetry.io/otel/semconv/v1.20.0"
-	"go.opentelemetry.io/otel/semconv/v1.20.0/httpconv"
+	semconv "go.opentelemetry.io/otel/semconv/v1.32.0"
+	"go.opentelemetry.io/otel/attribute"
 	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
@@ -133,7 +134,25 @@ func (tw traceware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// if we have access to chi routes, we could extract the route pattern beforehand.
 	spanName := ""
 	routePattern := ""
-	spanAttributes := httpconv.ServerRequest(tw.serverName, r)
+	spanAttributes := []attribute.KeyValue{
+		semconv.HTTPRequestMethodOriginal(r.Method),
+		semconv.URLScheme(r.URL.Scheme),
+		semconv.URLPath(r.URL.Path),
+	}
+	if tw.serverName != "" {
+		spanAttributes = append(spanAttributes, semconv.ServerAddress(tw.serverName))
+	}
+	if r.URL.RawQuery != "" {
+		spanAttributes = append(spanAttributes, semconv.URLQuery(r.URL.RawQuery))
+	}
+	if userAgent := r.Header.Get("User-Agent"); userAgent != "" {
+		spanAttributes = append(spanAttributes, semconv.UserAgentOriginal(userAgent))
+	}
+	if clientIP := r.Header.Get("X-Forwarded-For"); clientIP != "" {
+		spanAttributes = append(spanAttributes, semconv.ClientAddress(clientIP))
+	} else if clientIP := r.RemoteAddr; clientIP != "" {
+		spanAttributes = append(spanAttributes, semconv.ClientAddress(clientIP))
+	}
 
 	if tw.chiRoutes != nil {
 		rctx := chi.NewRouteContext()
@@ -215,10 +234,16 @@ func (tw traceware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// set status code attribute
-	span.SetAttributes(semconv.HTTPStatusCode(rrw.status))
+	span.SetAttributes(semconv.HTTPResponseStatusCode(rrw.status))
 
 	// set span status
-	span.SetStatus(httpconv.ServerStatus(rrw.status))
+	// Set span status based on HTTP status code
+	if rrw.status >= 400 && rrw.status < 500 {
+		// 4xx status codes - typically client errors, status left unset
+	} else if rrw.status >= 500 {
+		// 5xx status codes - server errors, set to Error
+		span.SetStatus(codes.Error, fmt.Sprintf("HTTP %d", rrw.status))
+	}
 }
 
 func addPrefixToSpanName(shouldAdd bool, prefix, spanName string) string {
